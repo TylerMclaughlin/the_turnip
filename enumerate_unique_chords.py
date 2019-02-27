@@ -4,7 +4,9 @@ from collections import Counter
 CHROMATIC_SCALE = range(0,12)
 
 def sorted_powerset(iterable):
-    "sorted_powerset([1,2,3]) --> (1,) (2,) (3,) (1,2) (1,3) (2,3) (1,2,3)"
+    """
+    sorted_powerset([1,2,3]) --> (1,) (2,) (3,) (1,2) (1,3) (2,3) (1,2,3)"
+    """
     s = list(iterable)
     chain = it.chain.from_iterable(it.combinations(s, r) for r in range(1, len(s)+1))
     ps_list = [list(x) for x in chain]
@@ -14,10 +16,11 @@ def sorted_powerset(iterable):
 
 
 def modz(chord,z=12):
-     '''
-     :chord: a list of pitches (0 through 11)
-     :z: int 12 for chromatic (Western )harmony, other ints for xenharmonic tunings
-     '''
+     """ 
+     :param chord:  A list of pitches (0 through 11)
+     :param z:  int 12 for chromatic (Western) harmony, other ints for xenharmonic tunings
+     :return:  List
+     """ 
      return [x % z for x in chord]
 
 def is_same_chord_class(chord1,chord2,z = 12):
@@ -35,12 +38,13 @@ def is_same_chord_class(chord1,chord2,z = 12):
 
 
 def find_unique_chords(sorted_powerset):
-    '''
-    :sorted_powerset: a list of lists 
-    :return: a list of dictionaries
-    '''
+    """ 
+    :sorted_powerset:  List of lists 
+    :return:  List of dictionaries
+    """ 
     i = 0  # global chord number
     k = 0  # count of chords per layer
+
     # first iterate over "layer" or size of chords, starting from the bottom.
     list_of_layers = []  # this will be a list of dicts 
     for layer in range(1,13):
@@ -52,21 +56,24 @@ def find_unique_chords(sorted_powerset):
             if len(chord) > layer:
                 break
             k += 1
-            print(chord)
-            #print(k)
+            print(f'Chord in ps is {chord}')
             if not bool(uniq_in_layer):  # if dict is empty when we are starting new layer
                 uniq_in_layer[tuple(chord)] = 1
-                print('empty dict')
+                print('empty dict, not searching dict just appending new chord')
             else:
                 list_of_new_unique_chords = []
+                print('searching for duplicates in dictionary')
                 for key in uniq_in_layer:
                     print(f'Chord is {chord}, key is {key}')
                     if is_same_chord_class(chord, list(key)):
-                        print('duplicate!')
+                        print('is a duplicate chord class...  incrementing!')
                         uniq_in_layer[key] += 1
+                        break
                     else:
                         # found a unique chord
+                        print('found a new chord')
                         list_of_new_unique_chords.append(tuple(chord))
+                        
                 for unique_new_chord in list_of_new_unique_chords:
                     uniq_in_layer[unique_new_chord] = 1
         # finish up!
