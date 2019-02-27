@@ -3,8 +3,8 @@ from collections import Counter
 
 CHROMATIC_SCALE = range(0,12)
 
-def powerset(iterable):
-    "powerset([1,2,3]) --> (1,) (2,) (3,) (1,2) (1,3) (2,3) (1,2,3)"
+def sorted_powerset(iterable):
+    "sorted_powerset([1,2,3]) --> (1,) (2,) (3,) (1,2) (1,3) (2,3) (1,2,3)"
     s = list(iterable)
     chain = it.chain.from_iterable(it.combinations(s, r) for r in range(1, len(s)+1))
     ps_list = [list(x) for x in chain]
@@ -12,9 +12,12 @@ def powerset(iterable):
     return(sorted(ps_list, key = len))
 
 
-#print(powerset([0,2,4,6]))
 
 def modz(chord,z=12):
+     '''
+     :chord: a list of pitches (0 through 11)
+     :z: int 12 for chromatic (Western )harmony, other ints for xenharmonic tunings
+     '''
      return [x % z for x in chord]
 
 def is_same_chord_class(chord1,chord2,z = 12):
@@ -31,12 +34,15 @@ def is_same_chord_class(chord1,chord2,z = 12):
     return same_bool 
 
 
-### FIX ME!!!
 def find_unique_chords(sorted_powerset):
+    '''
+    :sorted_powerset: a list of lists 
+    :return: a list of dictionaries
+    '''
     i = 0  # global chord number
     k = 0  # count of chords per layer
     # first iterate over "layer" or size of chords, starting from the bottom.
-    list_of_layers = []  # a list of dicts 
+    list_of_layers = []  # this will be a list of dicts 
     for layer in range(1,13):
         i += k
         k = 0
@@ -69,7 +75,7 @@ def find_unique_chords(sorted_powerset):
     
     return list_of_layers 
 
-test_ps = powerset([0, 1, 2, 3])
+test_ps = sorted_powerset([0, 1, 2, 3])
 print(test_ps)
 print(find_unique_chords(test_ps))
 
