@@ -61,21 +61,20 @@ def find_unique_chords(sorted_powerset):
                 uniq_in_layer[tuple(chord)] = 1
                 print('empty dict, not searching dict just appending new chord')
             else:
-                list_of_new_unique_chords = []
                 print('searching for duplicates in dictionary')
+                unique = True
                 for key in uniq_in_layer:
                     print(f'Chord is {chord}, key is {key}')
                     if is_same_chord_class(chord, list(key)):
                         print('is a duplicate chord class...  incrementing!')
                         uniq_in_layer[key] += 1
+                        unique = False
                         break
-                    else:
-                        # found a unique chord
-                        print('found a new chord')
-                        list_of_new_unique_chords.append(tuple(chord))
+                # found a unique chord
+                if unique:
+                    print('found a new chord')
+                    uniq_in_layer[tuple(chord)] = 1
                         
-                for unique_new_chord in list_of_new_unique_chords:
-                    uniq_in_layer[unique_new_chord] = 1
         # finish up!
         if bool(uniq_in_layer):  # if dictionary is not empty
            list_of_layers.append(uniq_in_layer) 
@@ -91,6 +90,18 @@ print(find_unique_chords(test_ps))
 def validate_num_chords_per_layer(dict_of_chords):
     n = [len(x) for x in dict_of_chords]
     print(n)
+
+
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+sns.set(style="darkgrid")
+
+tips = sns.load_dataset("tips")
+g = sns.FacetGrid(tips, row="sex", col="time", margin_titles=True)
+bins = np.linspace(0, 60, 13)
+g.map(plt.hist, "total_bill", color="steelblue", bins=bins)
+plt.show()
 
 
 def calculateChordFrequencyInScale(chord,scale):
