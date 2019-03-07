@@ -1,6 +1,12 @@
 import itertools as it
 from collections import Counter
 
+import pandas as pd
+
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+
 CHROMATIC_SCALE = range(0,12)
 
 def sorted_powerset(iterable):
@@ -81,9 +87,6 @@ def find_unique_chords(sorted_powerset):
     
     return list_of_layers 
 
-test_ps = sorted_powerset([0, 1, 2, 3])
-print(test_ps)
-print(find_unique_chords(test_ps))
 
 
 # this should agree with Polya's enumeration theorem.
@@ -91,31 +94,69 @@ def validate_num_chords_per_layer(dict_of_chords):
     n = [len(x) for x in dict_of_chords]
     print(n)
 
+def list_of_dicts_2_dataframe(lod):
+    df = pd.DataFrame([[1, key, i + 1, value ] for i, (key, value) in enumerate(lod[0].items())])
+    for layer, counter in enumerate(lod[1:]):
+        df2 = pd.DataFrame([[layer + 2, key, i + 1, value] for i, (key, value) in enumerate(counter.items())])
+        df = df.append(df2)
 
-import numpy as np
-import seaborn as sns
-import matplotlib.pyplot as plt
+    df.columns = ['layer', 'chord_class', 'num_in_layer', 'count', ]
+    return(df)
+
+
+
+import matplotlib.colors as mcolors
+
+# from stackoverflow: "Barplot colored according a colormap?"
+def make_colormap(seq):
+    """Return a LinearSegmentedColormap
+    seq: a sequence of floats and RGB-tuples. The floats should be increasing
+    and in the interval (0,1).
+    """
+    seq = [(None,) * 3, 0.0] + list(seq) + [1.0, (None,) * 3]
+    cdict = {'red': [], 'green': [], 'blue': []}
+    for i, item in enumerate(seq):
+        if isinstance(item, float):
+            r1, g1, b1 = seq[i - 1]
+            r2, g2, b2 = seq[i + 1]
+            cdict['red'].append([item, r1, r2])
+            cdict['green'].append([item, g1, g2])
+            cdict['blue'].append([item, b1, b2])
+
+    return mcolors.LinearSegmentedColormap('CustomMap', cdict)
+
+
+c = mcolors.ColorConverter().to_rgb
+rvb = make_colormap(
+[c('red'), 0.125, c('red'), c('orange'), 0.25, c('orange'),c('green'),0.5, c('green'),0.7, c('green'), c('blue'), 0.75, c('blue')])
+# then pass in  color=rvb(x/N)
+
+
 sns.set(style="darkgrid")
 
-tips = sns.load_dataset("tips")
-g = sns.FacetGrid(tips, row="sex", col="time", margin_titles=True)
-bins = np.linspace(0, 60, 13)
-g.map(plt.hist, "total_bill", color="steelblue", bins=bins)
-plt.show()
+def plot_polya_hists(df, min_layer = 1, max_layer = 12):
+    df = df[df['layer'] <= max_layer]
+    df = df[df['layer'] >= min_layer]
+    # to make sure correct format
+    #tips = sns.load_dataset("tips")
+    #print(tips)
+    g = sns.FacetGrid(df, col = "layer",  margin_titles=True, sharex = False, hue = 'layer', palette = 'tab20b')
+    g.map(plt.bar, "num_in_layer", "count")#, color=rvb((df.num_in_layer.values)/60))
+    plt.show()
 
+def test_polya_chords(parent_chord_or_scale):
+    test_ps = sorted_powerset(parent_chord_or_scale)
+    print(test_ps)
+    test_enum  = find_unique_chords(test_ps)
+    print(test_enum)
+    
+    df_test_enum  = list_of_dicts_2_dataframe(test_enum)
+    print(df_test_enum)
+    
+    plot_polya_hists(df_test_enum)
 
-def calculateChordFrequencyInScale(chord,scale):
-    # how many major triads in C Major?
-    # calculateChordFrequencyInScale([0,2,4],cMajor.getNotes() )
-    # returns frequency "3" because CEG, FAC, and GBD are the three major scales
-    chord = mod12(chord)
-    scale = set(mod12(scale))
-    frequency = 0
-    for i in range(0,12):
-        trialChord = [(x+i)%12 for x in chord]
-        trialSet = set(trialChord)
-        if trialSet.issubset(scale):
-            frequency += 1
-    return frequency
-
+#test_polya_chords([0,1,2,3,4])
+#test_polya_chords([0,1,2,3,4,5])
+#test_polya_chords(range(7))  # 7 adjacent chromatic notes
+test_polya_chords(range(12))
 
