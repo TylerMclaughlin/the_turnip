@@ -4,9 +4,21 @@ from collections import Counter
 import pandas as pd
 import json
 
+
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
+
+
+class bcolors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
 
 
 def sorted_powerset(iterable):
@@ -90,13 +102,24 @@ def find_unique_chords(sorted_powerset):
 
 
 # this should agree with Polya's enumeration theorem.
-def validate_num_chords_per_layer(dict_of_chords):
-    all_chord_lengths = [len(x) for x in dict_of_chords]
-    polya_counter = Counter(all_chord_lengths)
+def validate_num_unique_chords_per_layer(data_frame):
+    chord_lengths = [len(x) for x in data_frame]
+    polya_counter = Counter(chord_lengths)
     print(polya_counter)
-    with open('num_chords_per_layer.json', 'w') as f:
+    with open('num_unique_chords_per_layer.json', 'w') as f:
         json.dump(polya_counter, f, sort_keys=True, indent=4)
     return polya_counter
+
+
+# this should agree with binomial theorem
+
+def validate_total_chords_per_layer(powerset_list):
+    all_chord_lengths = [len(x) for x in powerset_list]
+    all_counter = Counter(all_chord_lengths)
+    print(all_counter)
+    with open('num_chords_per_layer.json', 'w') as f:
+        json.dump(all_counter, f, sort_keys=True, indent=4)
+    return all_counter
 
 
 def list_of_dicts_2_dataframe(lod):
@@ -138,7 +161,6 @@ rvb = make_colormap(
 # then pass in  color=rvb(x/N)
 
 
-sns.set(style="darkgrid")
 
 def plot_polya_hists(df, min_layer = 6, max_layer = 6):
     df = df[df['layer'] <= max_layer]
@@ -146,9 +168,18 @@ def plot_polya_hists(df, min_layer = 6, max_layer = 6):
     # to make sure correct format
     #tips = sns.load_dataset("tips")
     # print(tips)
-    g = sns.FacetGrid(df, col = "layer",  margin_titles=True, sharex = False, hue = 'layer', palette = 'tab20b')
+    g = sns.FacetGrid(df, col = "layer",  margin_titles=True, sharex = False, hue = 'layer', palette = ['#28FE14'])
     g.map(plt.bar, "num_in_layer", "count")#, color=rvb((df.num_in_layer.values)/60))
     plt.show()
+
+
+def make_enum(parent_chord_or_scale):
+    test_ps = sorted_powerset(parent_chord_or_scale)
+    test_enum  = find_unique_chords(test_ps)
+    df_test_enum  = list_of_dicts_2_dataframe(test_enum)
+
+    return df_test_enum
+
 
 def test_polya_chords(parent_chord_or_scale):
     test_ps = sorted_powerset(parent_chord_or_scale)
@@ -158,26 +189,43 @@ def test_polya_chords(parent_chord_or_scale):
     
     df_test_enum  = list_of_dicts_2_dataframe(test_enum)
     print(df_test_enum)
-    
+     
     plot_polya_hists(df_test_enum)
 
 
 # Make sure the algorithm is returning the same number of chords as 
 # I calculated analytically with Polya's enumeration theorem.
 
-def count_chords_per_layer(chromatic = range(12)):
-    all_unique_chords = sorted_powerset(chromatic)
-    print([x for x in all_unique_chords])
-    validate_num_chords_per_layer(all_unique_chords)
+def count_chords_per_layer(chromatic = range(12), mode = 'print'):
+    # all chords 
+    all_chords_ps = sorted_powerset(chromatic)
 
-count_chords_per_layer()
+    if mode == 'print':
+        print([x for x in all_chords_ps])
 
-## Inspect output of the enumeration algorithm
+    validate_total_chords_per_layer(all_chords_ps)
 
-#apply_dark_style()
-#test_polya_chords(range(12)) # all 12 chromatic notes
+    uniq_enum_df = make_enum(chromatic)
+
+    validate_num_unique_chords_per_layer(uniq_enum_df)
+    return uniq_enum_df
+
+
+def main():
+    count_chords_per_layer()
+
+    ## Inspect output of the enumeration algorithm
+
+    apply_dark_style()
+    print (bcolors.OKBLUE + "All chords:" \
+          + bcolors.ENDC)
+    test_polya_chords(range(12)) # all 12 chromatic notes
 
 def apply_dark_style():
     plt.style.use('dark_background')
 
+
+
+if __name__ == '__main__':
+    main()
 
