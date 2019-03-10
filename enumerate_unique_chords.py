@@ -2,12 +2,12 @@ import itertools as it
 from collections import Counter
 
 import pandas as pd
+import json
 
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-CHROMATIC_SCALE = range(0,12)
 
 def sorted_powerset(iterable):
     """
@@ -56,29 +56,29 @@ def find_unique_chords(sorted_powerset):
     for layer in range(1,13):
         i += k
         k = 0
-        print(f'The layer is {layer}')
+        # print(f'The layer is {layer}')
         uniq_in_layer = Counter()
         for chord in sorted_powerset[i:]:
             if len(chord) > layer:
                 break
             k += 1
-            print(f'Chord in ps is {chord}')
+            # print(f'Chord in ps is {chord}')
             if not bool(uniq_in_layer):  # if dict is empty when we are starting new layer
                 uniq_in_layer[tuple(chord)] = 1
-                print('empty dict, not searching dict just appending new chord')
+                # print('empty dict, not searching dict just appending new chord')
             else:
-                print('searching for duplicates in dictionary')
+                # print('searching for duplicates in dictionary')
                 unique = True
                 for key in uniq_in_layer:
-                    print(f'Chord is {chord}, key is {key}')
+                    # print(f'Chord is {chord}, key is {key}')
                     if is_same_chord_class(chord, list(key)):
-                        print('is a duplicate chord class...  incrementing!')
+                        # print('is a duplicate chord class...  incrementing!')
                         uniq_in_layer[key] += 1
                         unique = False
                         break
                 # found a unique chord
                 if unique:
-                    print('found a new chord')
+                    # print('found a new chord')
                     uniq_in_layer[tuple(chord)] = 1
                         
         # finish up!
@@ -91,8 +91,13 @@ def find_unique_chords(sorted_powerset):
 
 # this should agree with Polya's enumeration theorem.
 def validate_num_chords_per_layer(dict_of_chords):
-    n = [len(x) for x in dict_of_chords]
-    print(n)
+    all_chord_lengths = [len(x) for x in dict_of_chords]
+    polya_counter = Counter(all_chord_lengths)
+    print(polya_counter)
+    with open('num_chords_per_layer.json', 'w') as f:
+        json.dump(polya_counter, f, sort_keys=True, indent=4)
+    return polya_counter
+
 
 def list_of_dicts_2_dataframe(lod):
     df = pd.DataFrame([[1, key, i + 1, value ] for i, (key, value) in enumerate(lod[0].items())])
@@ -101,7 +106,8 @@ def list_of_dicts_2_dataframe(lod):
         df = df.append(df2)
 
     df.columns = ['layer', 'chord_class', 'num_in_layer', 'count', ]
-    return(df)
+    df = df.sort_values(['layer', 'num_in_layer'], ascending=[True, False])
+    return df 
 
 
 
@@ -134,12 +140,12 @@ rvb = make_colormap(
 
 sns.set(style="darkgrid")
 
-def plot_polya_hists(df, min_layer = 1, max_layer = 12):
+def plot_polya_hists(df, min_layer = 6, max_layer = 6):
     df = df[df['layer'] <= max_layer]
     df = df[df['layer'] >= min_layer]
     # to make sure correct format
     #tips = sns.load_dataset("tips")
-    #print(tips)
+    # print(tips)
     g = sns.FacetGrid(df, col = "layer",  margin_titles=True, sharex = False, hue = 'layer', palette = 'tab20b')
     g.map(plt.bar, "num_in_layer", "count")#, color=rvb((df.num_in_layer.values)/60))
     plt.show()
@@ -155,8 +161,23 @@ def test_polya_chords(parent_chord_or_scale):
     
     plot_polya_hists(df_test_enum)
 
-#test_polya_chords([0,1,2,3,4])
-#test_polya_chords([0,1,2,3,4,5])
-#test_polya_chords(range(7))  # 7 adjacent chromatic notes
-test_polya_chords(range(12))
+
+# Make sure the algorithm is returning the same number of chords as 
+# I calculated analytically with Polya's enumeration theorem.
+
+def count_chords_per_layer(chromatic = range(12)):
+    all_unique_chords = sorted_powerset(chromatic)
+    print([x for x in all_unique_chords])
+    validate_num_chords_per_layer(all_unique_chords)
+
+count_chords_per_layer()
+
+## Inspect output of the enumeration algorithm
+
+#apply_dark_style()
+#test_polya_chords(range(12)) # all 12 chromatic notes
+
+def apply_dark_style():
+    plt.style.use('dark_background')
+
 
