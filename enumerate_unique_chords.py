@@ -106,7 +106,7 @@ def validate_num_unique_chords_per_layer(data_frame):
     chord_lengths = [len(x) for x in data_frame]
     polya_counter = Counter(chord_lengths)
     print(polya_counter)
-    with open('num_unique_chords_per_layer.json', 'w') as f:
+    with open('calculated_num_unique_chords_per_layer.json', 'w') as f:
         json.dump(polya_counter, f, sort_keys=True, indent=4)
     return polya_counter
 
@@ -117,7 +117,7 @@ def validate_total_chords_per_layer(powerset_list):
     all_chord_lengths = [len(x) for x in powerset_list]
     all_counter = Counter(all_chord_lengths)
     print(all_counter)
-    with open('num_chords_per_layer.json', 'w') as f:
+    with open('calculated_num_chords_per_layer.json', 'w') as f:
         json.dump(all_counter, f, sort_keys=True, indent=4)
     return all_counter
 
