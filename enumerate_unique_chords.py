@@ -4,7 +4,9 @@ from collections import Counter
 import numpy as np
 import pandas as pd
 import json
+import os
 
+from scipy.cluster.hierarchy import dendrogram, linkage
 
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -46,6 +48,7 @@ def is_same_chord_class(chord1,chord2,z = 12):
     # like pitch class, but with chords.
     same_bool = False
     # make sure chord is valid
+    chord1 = modz(chord1,z=z)
     chord2 = modz(chord2,z=z)
     for i in range(0,z):
         transposed_chord1 = [(x + i) % z for x in chord1]
@@ -211,7 +214,7 @@ def count_chords_per_layer(chromatic = range(12), mode = 'print'):
     return uniq_enum_df
 
 
-def main():
+def main_old():
     count_chords_per_layer()
 
     ## Inspect output of the enumeration algorithm
@@ -220,6 +223,200 @@ def main():
     print (bcolors.OKBLUE + "All chords:" \
           + bcolors.ENDC)
     test_polya_chords(range(12)) # all 12 chromatic notes
+
+def count_transpositional_siblings(parent_chord_class, child_chord_class, z = 12):
+    s = 0 # number of siblings
+    # transpose ccc z times
+    for t in range(0, z):
+        t_child_chord_class = [(x + t) % z for x in child_chord_class]
+        if set(t_child_chord_class).issubset(parent_chord_class):
+            s +=1
+    return s
+   
+
+def make_matrix(enum_df, layer1, layer2, rename = True, z = 12):
+    if layer1 == layer2:
+        raise ValueError('layers must be different') 
+    l1_chords = enum_df[enum_df['layer'] == layer1].chord_class.values 
+    l2_chords = enum_df[enum_df['layer'] == layer2].chord_class.values 
+    # initialize matrix with rows for each chord class in layer 1,
+    # columns for each chord class in layer 2. 
+    matrix = np.zeros((len(l1_chords),len(l2_chords)))
+    # naming convention is that layer 1 is parent, layer 2 is child
+    for i, p_i in enumerate(l1_chords):
+        for j, c_j in enumerate(l2_chords):
+            # fill in matrix with the number of transpositional siblings
+            matrix[i,j] = count_transpositional_siblings(p_i, c_j, z)  
+    df_matrix = pd.DataFrame(data = matrix, columns = list(l2_chords), index = list(l1_chords))
+    #df_matrix.rename(index=list(l1_chords), inplace=True)
+    if rename:
+        rename_dict = pd.Series(enum_df.chord_class_name.values,index=enum_df.chord_class).to_dict()
+        df_matrix = df_matrix.rename(columns=rename_dict, index=rename_dict) 
+    return df_matrix
+
+
+def make_all_matrices(enum_df):
+    # returns a dictionary of matrices
+    layers = enum_df['layer'].unique()
+    matrix_dict = {}
+    for x in layers:
+        for y in layers:
+            if y >= x:
+                continue
+            matrix_dict[(x,y)] = make_matrix(enum_df, x, y)
+    return matrix_dict
+  
+# only applies to 12-tet scales 
+def build_common_name_dict():
+    common_names = {(0, 4, 7) : 'major_triad', (0, 3, 7) : 'minor_triad', \
+    (0, 3, 6) : 'diminished_triad', (0, 4, 8) : 'augmented_triad'} 
+    # more trichords 
+    common_names[(0, 2, 4)] = 'do_re_mi' # same as fa so la, beginning of lydian, mixolydian, ionian
+    common_names[(0, 2, 3)] = 're_mi_fa' # beginning of dorian and aeolian modes
+    common_names[(0, 1, 3)] = 'mi_fa_so' # beginning of phrygian and locrian modes 
+    common_names[(0, 2, 3)] = 're_mi_fa' # beginning of dorian and aeolian modes
+    common_names[(0, 3, 10)] = 'weird_fishes' # first arpeggio in 'weird fishes' 
+    common_names[(0, 4, 11)] = 'willy_wonka' # melody in 'come with me' in 'pure imagination' in willy wonka and the chocolate factory
+    common_names[(0, 5, 10)] = 'quartal_triad' # mccoy tyner plays lots of these
+    # seventh chords
+    common_names[(0, 4, 7, 11)] = 'major_seventh'
+    common_names[(0, 3, 7, 10)] = 'minor_seventh'
+    common_names[(0, 4, 7, 10)] = 'dominant_seventh'
+    common_names[(0, 3, 6, 10)] = 'half_diminished_seventh'
+    common_names[(0, 3, 7, 11)] = 'minor_major_seventh'
+    common_names[(0, 4, 8, 11)] = 'augmented_major_seventh'
+    common_names[(0, 3, 6, 9)] = 'diminished_seventh'
+    # 4-note jazz building block pieces 
+    # these are things I add all the time for color in extended jazz chords.
+    common_names[(0, 4, 6, 11)] = 'fabe' # rootless voicing for 7th chord, minor 6 9, etc
+    common_names[(0, 5, 7, 11)] = 'cfgb' # negative harmony of fabe, dom 7-like, maj 7 like 
+    common_names[(0, 3, 6, 11)] = 'diminished_major_seventh' # common in jazz. found in octatonic scale 
+    common_names[(0, 5, 8, 11)] = 'inv_dim_major_seventh' # negative harmony of diminished major seven, also in octatonic 
+    common_names[(0, 3, 5, 10)] = '4_stacked_fourths' # most versatile chord
+    common_names[(0, 4, 5, 7)] = 'primordial_ooze' # ape escape soundtrack
+    common_names[(0, 2, 4, 7)] = 'ff_major' # final fantasy prelude 
+    common_names[(0, 4, 9, 11)] = 'careless_whisper' # george michael's 'careless whisper'
+    #common_names[(0, 2, 3, 7)] = 'ff_minor' # final fantasy prelude, minor arp.  same class as careless whisper 
+    # 5-note scales 
+    common_names[(0, 3, 5, 7, 10)] = 'pentatonic_scale' # equivalent to minor7 add 11 chord
+    common_names[(0, 2, 3, 7, 8)] = 'hirajoshi_scale' # japanese shamisen scale
+    common_names[(0, 2, 3, 7, 9)] = 'insen_scale' # aka kumoi. brighter than hirajoshi, differs by one note  
+    common_names[(0, 2, 3, 7, 10)] = 'minor_ninth' # versatile in electronic music
+    #common_names[(0, 4, 7, 9, 11)] = 'major_7_add_13' # same ambiguity in major scale as major 7 chord  
+    # same as minor_ninth
+    # 6-note scales 
+    common_names[(0, 2, 4, 7, 9, 11)] = 'major_7_no_avoid' #  major 7 compatible scale without 4th (lydian or ionian sound)
+    common_names[(0, 3, 4, 7, 8, 11)] = 'augmented_scale' # contains 3 major 7 chords 
+    common_names[(0, 2, 4, 6, 8, 10)] = 'wholetone_scale' # 
+    # 7-note scales
+    common_names[(0, 2, 4, 5, 7, 9, 11)] = 'major_scale'
+    common_names[(0, 2, 3, 5, 7, 9, 11)] = 'altered_scale'
+    common_names[(0, 2, 3, 5, 7, 8, 11)] = 'harmonic_minor_scale'
+    common_names[(0, 2, 4, 5, 7, 8, 11)] = 'harmonic_major_scale'
+    # 8-note scales
+    common_names[(0, 1, 3, 4, 6, 7, 9, 10)] = 'octatonic'
+    common_names[(0, 2, 4, 5, 7, 8, 9, 11)] = 'bebop_scale'
+    # chromatic scale 
+    common_names[(0,1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)] = 'chromatic_scale'
+    for c1 in common_names.keys():
+        for c2 in common_names.keys():
+            if c1 == c2:
+                continue
+            elif is_same_chord_class(c1, c2):
+                scale1 = common_names[c1]
+                scale2 = common_names[c2]
+                print(scale1 + ' and ' + scale2 + ' are the same')
+    return common_names
+
+common_names_12tet_dict = build_common_name_dict()
+                
+def rename_common_scales(df, common_names_dict = common_names_12tet_dict):
+    df = df.reset_index()
+    unique_chord_classes = df.chord_class.unique()
+    df['chord_class_name'] = df['chord_class']
+    for i, chord_class in enumerate(unique_chord_classes):
+        for common_chord in common_names_dict.keys():
+           if is_same_chord_class(chord_class, common_chord):
+               df.at[i,'chord_class_name'] = common_names_dict[common_chord]
+    return df              
+
+def get_inverse(chord, z = 12):
+    inverse_chord_unmodded = [(z - note) for note in chord]
+    inverse_chord = [note % z for note in inverse_chord_unmodded]
+    return inverse_chord
+
+def is_enantiomer(row, common_names_dict, z = 12):
+    chord = row['chord_class']
+    inverse = get_inverse(chord, z)
+    if is_same_chord_class(chord,inverse):
+        return 'non-chiral'
+    else: # find common name of inverse
+        for common_chord in common_names_dict.keys():
+            if is_same_chord_class(common_chord, inverse):
+                return common_names_dict[common_chord]
+        return inverse 
+
+def add_enantiomer(df, common_names_dict =  common_names_12tet_dict, z = 12):
+    df['enantiomer'] = df.apply(is_enantiomer, args = (common_names_dict, z), axis = 1)
+    return df
+    
+    
+
+def plot_matrix(matrix, color_style = "qual"):
+    f, ax = plt.subplots(figsize=(11, 9))
+    
+    if color_style == "div":
+        cmap = sns.diverging_palette(120, 10, s = 85, as_cmap=True, center = 'dark')
+    elif color_style == "qual":
+        cmap = sns.diverging_palette(120, 300, s = 85, as_cmap=True, center = 'dark')
+    sns.set(font_scale = 0.6)
+    
+    # Draw the heatmap with correct aspect ratio
+    sns.heatmap(matrix, cmap=cmap, center=0,
+                square=True,  cbar_kws={"ticks":[0,1,2,3,4,5,6,7,8,9,10,11,12], "shrink": .5})
+    #plt.show()
+
+    
+
+
+
+def main():
+    ## make a dataframe with the results from enumerating chords.
+    ## Polya enumeration of unique chords invariant to transposition.
+    x = make_enum([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11])
+    x = rename_common_scales(x)
+    x = add_enantiomer(x)
+    
+    ## make a dictionary of dataframe matrices with tuple of two layers as keys.
+    ## the elements of the df matrix are the number of transpositions the subset 
+    ## can have while still being a subset of the parent scale.
+    #omg = make_all_matrices(x)
+    # heatmaps 
+    #for matrix in omg.keys():
+    #    plot_matrix(omg[matrix])
+    #    plt.savefig('matrices_common_scales_renamed/' + str(matrix[0]) + '_' + str(matrix[1]))
+    #    plt.close()
+    ##if not os.path.exists('clustermap'):
+    ##    os.mkdir('clustermap')
+    ##dpi = 72.27
+    ##for matrix in omg.keys():
+    ##    if (matrix[0] > 1) & (matrix[1] > 1) & (matrix[0] < 12) & (matrix[1] < 12):
+    ##        if ( omg[matrix].shape[0] > 20) | (omg[matrix].shape[1] > 20):
+    ##            f = 15
+    ##        else:
+    ##            f = 8
+    ##        sns.clustermap(omg[matrix],xticklabels=True, yticklabels=True, figsize = (f,f), cbar_kws={'label': 'n transpositional siblings'})
+    ##        
+    ##        plt.savefig('clustermap/' + str(matrix[0]) + '_' + str(matrix[1]))
+    # dendrograms
+    #for matrix in omg.keys():
+    #    Z = linkage(omg[matrix], 'ward')
+    #    dendrogram(Z, leaf_rotation=0, leaf_font_size=4, labels=omg[matrix].index, orientation='left') 
+    #    plt.savefig('dendrograms/' + str(matrix[0]) + '_' + str(matrix[1]))
+    #    plt.close()
+
+    ## make a matrix
+
 
 def apply_dark_style():
     plt.style.use('dark_background')
