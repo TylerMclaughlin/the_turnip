@@ -361,7 +361,7 @@ def add_enantiomer(df, common_names_dict =  common_names_12tet_dict, z = 12):
     return df
 
 
-def convert_to_x_major(chord, scale, z = 12):
+def transpose_to_x_scale(chord, scale, z = 12):
     '''
     Specify a scale (not a class but a specific scale like D# Major, D# altered), 
     and a pitch class set will be transposed and returned as a subset of the specific scale.
@@ -369,10 +369,15 @@ def convert_to_x_major(chord, scale, z = 12):
     '''
     chord = list(chord)
     scale = list(scale)
-    for i in range(0,12):
+    for i in range(0,z):
         transposed_chord = [(n + i)%z for n in chord]
         if set(transposed_chord).issubset(set(scale)):
             return sorted(transposed_chord)
+        # for rare case where chord is the scale
+        if set(transposed_chord) == (set(scale)):
+            return sorted(transposed_chord)
+    # if none of these transpositions work,
+    # return empty chord 
     return [] 
 
     
