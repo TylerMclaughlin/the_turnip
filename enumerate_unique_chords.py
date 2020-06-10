@@ -255,7 +255,7 @@ def make_matrix(enum_df, layer1, layer2, rename = True, z = 12):
     return df_matrix
 
 
-def make_all_matrices(enum_df):
+def make_all_2layer_matrices(enum_df):
     # returns a dictionary of matrices
     layers = enum_df['layer'].unique()
     matrix_dict = {}
@@ -376,8 +376,93 @@ def plot_matrix(matrix, color_style = "qual"):
                 square=True,  cbar_kws={"ticks":[0,1,2,3,4,5,6,7,8,9,10,11,12], "shrink": .5})
     #plt.show()
 
-    
+def matrix_dict_heatmaps(matrix_dict):
+    # heatmaps 
+    for matrix in matrix_dict.keys():
+        plot_matrix(matrix_dict[matrix])
+        plt.savefig('matrices_common_scales_renamed/' + str(matrix[0]) + '_' + str(matrix[1]))
+        plt.close()
 
+
+def matrix_dict_dendrograms(matrix_dict):
+    # make all dendrograms given a list of matrices
+    for matrix in matrix_dict.keys():
+        Z = linkage(matrix_dict[matrix], 'ward')
+        dendrogram(Z, leaf_rotation=0, leaf_font_size=4, labels=matrix_dict[matrix].index, orientation='left') 
+        plt.savefig('dendrograms/' + str(matrix[0]) + '_' + str(matrix[1]))
+        plt.close()
+
+def matrix_dict_clustermaps(matrix_dict, subdir = ''):
+    clustermap_path = os.path.join('clustermap', subdir)
+    if not os.path.exists(clustermap_path):
+        os.makedirs(clustermap_path)
+    dpi = 72.27
+    for matrix in matrix_dict.keys():
+        # if non-trivial clusterable
+        # depends on type of matrix
+        if ( (matrix[0] > 1) & (matrix[1] > 1) & (matrix[0] < 12) & (matrix[1] < 12) ):
+            if ( matrix_dict[matrix].shape[0] > 20) | (matrix_dict[matrix].shape[1] > 20):
+                f = 15
+            else:
+                f = 8
+            sns.clustermap(matrix_dict[matrix],xticklabels=True, yticklabels=True, \
+                figsize = (f,f), cbar_kws={'label': 'n transpositional siblings'})
+            filename =  str(matrix[0]) + '_' + str(matrix[1])
+            plt.savefig(os.path.join(clustermap_path, filename))
+    
+def matrix_dict_clustermaps_all_subsets(matrix_dict, subdir = 'one_parent_all_subsets'):
+    clustermap_path = os.path.join('clustermap', subdir)
+    if not os.path.exists(clustermap_path):
+        os.makedirs(clustermap_path)
+    dpi = 72.27
+    for matrix in matrix_dict.keys():
+        # make sure elements are int.  
+        # exclude matrix_dict[1] because it's empty
+        if isinstance(matrix, int) & (matrix > 1) :
+            # cluster where possible
+            cluster_rows = True 
+            cluster_cols = True 
+            # these matrices have only 1 row, so they can't be clustered 
+            if (matrix == 12) or (matrix == 11):
+                cluster_rows = False
+            # this matrix has only 1 column, so it can't be clustered 
+            elif matrix == 2:
+                cluster_cols = False
+
+            print(matrix_dict[matrix])
+            if matrix > 7:
+                f = 30 
+            elif matrix > 6:
+                f = 25 
+            elif matrix > 5:
+                f = 20 
+            elif ( matrix_dict[matrix].shape[0] > 20) | (matrix_dict[matrix].shape[1] > 20):
+                f = 15
+            else:
+                f = 8
+            sns.clustermap(matrix_dict[matrix],xticklabels=True, yticklabels=True, \
+                col_cluster = cluster_cols, row_cluster = cluster_rows,\
+                figsize = (f,f), cbar_kws={'label': 'n transpositional siblings'})
+            filename =  str(matrix) 
+            plt.savefig(os.path.join(clustermap_path, filename))
+            plt.close()
+
+def make_all_subset_matrices(two_layer_matrix_dict):
+    # takes a dictionary of 2-layer matrices. 
+    # returns an 11 element dictionary
+    # shape of element number 5 is (n 5 scales, n_4_scales + n_3_scales + n_2_scales + n_1_scales).
+    # shape of element number 5 is (n 5 scales, n_4_scales + n_3_scales + n_2_scales + n_1_scales).
+    all_subset_dict = {}
+    for x in reversed(range(1,13)): 
+        matrices_in_x = []
+        for y in reversed(range(1, x)):
+            matrices_in_x.append(two_layer_matrix_dict[(x,y)])
+        #print(matrices_in_x)
+        if len(matrices_in_x) > 1:
+            all_subset_dict[x] = pd.concat(matrices_in_x, axis = 1)
+        elif x != 1:
+            all_subset_dict[x] = two_layer_matrix_dict[(x,y)]
+    return all_subset_dict
 
 
 def main():
@@ -387,35 +472,13 @@ def main():
     x = rename_common_scales(x)
     x = add_enantiomer(x)
     
-    ## make a dictionary of dataframe matrices with tuple of two layers as keys.
-    ## the elements of the df matrix are the number of transpositions the subset 
-    ## can have while still being a subset of the parent scale.
-    #omg = make_all_matrices(x)
-    # heatmaps 
-    #for matrix in omg.keys():
-    #    plot_matrix(omg[matrix])
-    #    plt.savefig('matrices_common_scales_renamed/' + str(matrix[0]) + '_' + str(matrix[1]))
-    #    plt.close()
-    ##if not os.path.exists('clustermap'):
-    ##    os.mkdir('clustermap')
-    ##dpi = 72.27
-    ##for matrix in omg.keys():
-    ##    if (matrix[0] > 1) & (matrix[1] > 1) & (matrix[0] < 12) & (matrix[1] < 12):
-    ##        if ( omg[matrix].shape[0] > 20) | (omg[matrix].shape[1] > 20):
-    ##            f = 15
-    ##        else:
-    ##            f = 8
-    ##        sns.clustermap(omg[matrix],xticklabels=True, yticklabels=True, figsize = (f,f), cbar_kws={'label': 'n transpositional siblings'})
-    ##        
-    ##        plt.savefig('clustermap/' + str(matrix[0]) + '_' + str(matrix[1]))
-    # dendrograms
-    #for matrix in omg.keys():
-    #    Z = linkage(omg[matrix], 'ward')
-    #    dendrogram(Z, leaf_rotation=0, leaf_font_size=4, labels=omg[matrix].index, orientation='left') 
-    #    plt.savefig('dendrograms/' + str(matrix[0]) + '_' + str(matrix[1]))
-    #    plt.close()
+    omg = make_all_2layer_matrices(x)
+    matrix_dict_dendrograms(omg)
+    matrix_dict_clustermaps(omg, subdir = '')
+    matrix_dict_heatmaps(omg)
+    d = e.make_all_subset_matrices(omg)
+    
 
-    ## make a matrix
 
 
 def apply_dark_style():
