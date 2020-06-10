@@ -359,6 +359,22 @@ def is_enantiomer(row, common_names_dict, z = 12):
 def add_enantiomer(df, common_names_dict =  common_names_12tet_dict, z = 12):
     df['enantiomer'] = df.apply(is_enantiomer, args = (common_names_dict, z), axis = 1)
     return df
+
+
+def convert_to_x_major(chord, scale, z = 12):
+    '''
+    Specify a scale (not a class but a specific scale like D# Major, D# altered), 
+    and a pitch class set will be transposed and returned as a subset of the specific scale.
+    If transposition cannot bring into the scale, returns ""
+    '''
+    chord = list(chord)
+    scale = list(scale)
+    for i in range(0,12):
+        transposed_chord = [(n + i)%z for n in chord]
+        if set(transposed_chord).issubset(set(scale)):
+            return sorted(transposed_chord)
+    return [] 
+
     
     
 
@@ -464,13 +480,22 @@ def make_all_subset_matrices(two_layer_matrix_dict):
             all_subset_dict[x] = two_layer_matrix_dict[(x,y)]
     return all_subset_dict
 
+def get_twelve_tone_table():
+    x = make_enum([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11])
+    x = rename_common_scales(x)
+    x = add_enantiomer(x)
+    return x
 
 def main():
     ## make a dataframe with the results from enumerating chords.
     ## Polya enumeration of unique chords invariant to transposition.
-    x = make_enum([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11])
-    x = rename_common_scales(x)
-    x = add_enantiomer(x)
+    x = get_twelve_tone_table()
+    data_dir = 'data' 
+    if not os.path.exists(data_dir):
+        os.mkdir(data_dir)
+    x.to_csv(os.path.join(data_dir,'twelve_tone_pitch_class_sets_enumerated.csv'))
+
+
     
     omg = make_all_2layer_matrices(x)
     matrix_dict_dendrograms(omg)
