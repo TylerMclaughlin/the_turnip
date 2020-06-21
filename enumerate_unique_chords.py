@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import json
 import os
+import time
 
 from scipy.cluster.hierarchy import dendrogram, linkage
 
@@ -35,7 +36,7 @@ def sorted_powerset(iterable):
 
 
 
-def modz(chord,z=12):
+def modz(chord, z = 12):
      """ 
      :param chord:  A list of pitches (0 through 11)
      :param z:  int 12 for chromatic (Western) harmony, other ints for xenharmonic tunings
@@ -43,13 +44,13 @@ def modz(chord,z=12):
      """ 
      return [x % z for x in chord]
 
-def is_same_chord_class(chord1,chord2,z = 12):
+def is_same_chord_class(chord1, chord2, z = 12):
     # chord "species"
     # like pitch class, but with chords.
     same_bool = False
     # make sure chord is valid
-    chord1 = modz(chord1,z=z)
-    chord2 = modz(chord2,z=z)
+    chord1 = modz(chord1, z=z)
+    chord2 = modz(chord2, z=z)
     for i in range(0,z):
         transposed_chord1 = [(x + i) % z for x in chord1]
         if set(chord2) == set(transposed_chord1):
@@ -58,7 +59,7 @@ def is_same_chord_class(chord1,chord2,z = 12):
     return same_bool 
 
 
-def find_unique_chords(sorted_powerset):
+def find_unique_chords(sorted_powerset, z = 12):
     """ 
     :sorted_powerset:  List of lists 
     :return:  List of dictionaries
@@ -68,7 +69,7 @@ def find_unique_chords(sorted_powerset):
 
     # first iterate over "layer" or size of chords, starting from the bottom.
     list_of_layers = []  # this will be a list of dicts 
-    for layer in range(1,13):
+    for layer in range(1, z + 1):
         i += k
         k = 0
         # print(f'The layer is {layer}')
@@ -86,7 +87,7 @@ def find_unique_chords(sorted_powerset):
                 unique = True
                 for key in uniq_in_layer:
                     # print(f'Chord is {chord}, key is {key}')
-                    if is_same_chord_class(chord, list(key)):
+                    if is_same_chord_class(chord, list(key), z):
                         # print('is a duplicate chord class...  incrementing!')
                         uniq_in_layer[key] += 1
                         unique = False
@@ -176,18 +177,39 @@ def plot_polya_hists(df, min_layer = 6, max_layer = 6):
     plt.show()
 
 
-def make_enum(parent_chord_or_scale):
+def make_enum(parent_chord_or_scale, z = None, timer = False, save = False):
+    start_time = time.time()
+    if z is None:
+        z = len(parent_chord_or_scale)
     test_ps = sorted_powerset(parent_chord_or_scale)
-    test_enum  = find_unique_chords(test_ps)
+    test_enum  = find_unique_chords(test_ps, z)
     df_test_enum  = list_of_dicts_2_dataframe(test_enum)
-
+    end_time = time.time()
+    if save:
+        if not os.path.exists('edo_enums'):
+            os.mkdir('edo_enums')
+        df_test_enum.to_csv(f'edo_enums/enum_{z}.csv')
+    if timer:
+        return (end_time - start_time)
     return df_test_enum
 
+def time_make_enum(max_n, save):
+    log = np.zeros(max_n)
+    for x in range(1, max_n+1):
+        log[x - 1] = make_enum(range(0, x), timer = True,  save = save)
+    if not os.path.exists('edo_enums'):
+        os.mkdir('edo_enums')
+    with open('edo_enums/compute_time_seconds_1_to_N_edo.npy', 'wb') as f:
+        np.save(f,log)
+    return log
 
-def test_polya_chords(parent_chord_or_scale):
+
+def test_polya_chords(parent_chord_or_scale, z = None):
+    if z is None:
+        z = len(parent_chord_or_scale)
     test_ps = sorted_powerset(parent_chord_or_scale)
     print(test_ps)
-    test_enum  = find_unique_chords(test_ps)
+    test_enum  = find_unique_chords(test_ps, z)
     print(test_enum)
     
     df_test_enum  = list_of_dicts_2_dataframe(test_enum)
@@ -199,7 +221,9 @@ def test_polya_chords(parent_chord_or_scale):
 # Make sure the algorithm is returning the same number of chords as 
 # I calculated analytically with Polya's enumeration theorem.
 
-def count_chords_per_layer(chromatic = range(12), mode = 'print'):
+def count_chords_per_layer(chromatic = range(12), z = None, mode = 'print'):
+    if z is None:
+        z = len(parent_chord_or_scale)
     # all chords 
     all_chords_ps = sorted_powerset(chromatic)
 
@@ -208,7 +232,7 @@ def count_chords_per_layer(chromatic = range(12), mode = 'print'):
 
     validate_total_chords_per_layer(all_chords_ps)
 
-    uniq_enum_df = make_enum(chromatic)
+    uniq_enum_df = make_enum(chromatic, z)
 
     validate_num_unique_chords_per_layer(uniq_enum_df)
     return uniq_enum_df
@@ -234,7 +258,7 @@ def count_transpositional_siblings(parent_chord_class, child_chord_class, z = 12
     return s
    
 
-def make_matrix(enum_df, layer1, layer2, rename = True, z = 12):
+def make_matrix(enum_df, layer1, layer2, z, rename = True):
     if layer1 == layer2:
         raise ValueError('layers must be different') 
     l1_chords = enum_df[enum_df['layer'] == layer1].chord_class.values 
@@ -255,7 +279,7 @@ def make_matrix(enum_df, layer1, layer2, rename = True, z = 12):
     return df_matrix
 
 
-def make_all_2layer_matrices(enum_df):
+def make_all_2layer_matrices(enum_df, z):
     # returns a dictionary of matrices
     layers = enum_df['layer'].unique()
     matrix_dict = {}
@@ -263,11 +287,21 @@ def make_all_2layer_matrices(enum_df):
         for y in layers:
             if y >= x:
                 continue
-            matrix_dict[(x,y)] = make_matrix(enum_df, x, y)
+            matrix_dict[(x,y)] = make_matrix(enum_df, x, y, z)
     return matrix_dict
   
+def assert_common_names_not_equivalent_pitch_class_sets(common_names, z):
+    for c1 in common_names.keys():
+        for c2 in common_names.keys():
+            if c1 == c2:
+                continue
+            elif is_same_chord_class(c1, c2, z):
+                scale1 = common_names[c1]
+                scale2 = common_names[c2]
+                print(scale1 + ' and ' + scale2 + ' are the same pitch class set.')
+
 # only applies to 12-tet scales 
-def build_common_name_dict():
+def build_common_name_dict_12_tone():
     common_names = {(0, 4, 7) : 'major_triad', (0, 3, 7) : 'minor_triad', \
     (0, 3, 6) : 'diminished_triad', (0, 4, 8) : 'augmented_triad'} 
     # more trichords 
@@ -318,25 +352,32 @@ def build_common_name_dict():
     common_names[(0, 2, 4, 5, 7, 8, 9, 11)] = 'bebop_scale'
     # chromatic scale 
     common_names[(0,1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)] = 'chromatic_scale'
-    for c1 in common_names.keys():
-        for c2 in common_names.keys():
-            if c1 == c2:
-                continue
-            elif is_same_chord_class(c1, c2):
-                scale1 = common_names[c1]
-                scale2 = common_names[c2]
-                print(scale1 + ' and ' + scale2 + ' are the same')
+    assert_common_names_not_equivalent_pitch_class_sets(common_names, z = 12)
     return common_names
 
-common_names_12tet_dict = build_common_name_dict()
+def build_common_name_dict_19_tone():
+    common_names = {(0, 6, 11) : 'major_triad', (0, 5, 11) : 'minor_triad'}
+    common_names[(0, 5, 8, 11, 16)] = 'pentatonic_scale'
+    common_names[(0, 3, 6, 8, 11, 14, 17)] = 'major_scale'
+    common_names[(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18)] = 'chromatic'
+    assert_common_names_not_equivalent_pitch_class_sets(common_names, z = 19)
+    return common_names
+
+
+common_names_12tet_dict = build_common_name_dict_12_tone()
                 
-def rename_common_scales(df, common_names_dict = common_names_12tet_dict):
+def rename_common_scales(df, z, common_names_dict = None):
+    if common_names_dict is None:
+        chromatic_key = tuple(range(0,z))
+        common_names_dict = {chromatic_key : 'chromatic'}
+    error_string = f"Pitch classes in common_names_dict are not numerically less than {z} in EDO {z}. Make sure pitch class sets are ascending."
+    assert max([key[-1] for key in common_names_dict.keys()]) < z, error_string
     df = df.reset_index()
     unique_chord_classes = df.chord_class.unique()
     df['chord_class_name'] = df['chord_class']
     for i, chord_class in enumerate(unique_chord_classes):
         for common_chord in common_names_dict.keys():
-           if is_same_chord_class(chord_class, common_chord):
+           if is_same_chord_class(chord_class, common_chord, z):
                df.at[i,'chord_class_name'] = common_names_dict[common_chord]
     return df              
 
@@ -346,17 +387,23 @@ def get_inverse(chord, z = 12):
     return inverse_chord
 
 def is_enantiomer(row, common_names_dict, z = 12):
+    if common_names_dict is None:
+        chromatic_key = tuple(range(0, z))
+        common_names_dict = {chromatic_key : 'chromatic'}
     chord = row['chord_class']
     inverse = get_inverse(chord, z)
-    if is_same_chord_class(chord,inverse):
+    if is_same_chord_class(chord,inverse, z):
         return 'non-chiral'
     else: # find common name of inverse
         for common_chord in common_names_dict.keys():
-            if is_same_chord_class(common_chord, inverse):
+            if is_same_chord_class(common_chord, inverse, z):
                 return common_names_dict[common_chord]
         return inverse 
 
-def add_enantiomer(df, common_names_dict =  common_names_12tet_dict, z = 12):
+def add_enantiomer(df, z, common_names_dict = None):
+    if z == 12:
+        if common_names_dict is None:
+            common_names_dict = common_names_12tet_dict 
     df['enantiomer'] = df.apply(is_enantiomer, args = (common_names_dict, z), axis = 1)
     return df
 
@@ -397,23 +444,37 @@ def plot_matrix(matrix, color_style = "qual"):
                 square=True,  cbar_kws={"ticks":[0,1,2,3,4,5,6,7,8,9,10,11,12], "shrink": .5})
     #plt.show()
 
-def matrix_dict_heatmaps(matrix_dict):
+def matrix_dict_heatmaps(matrix_dict, subdir = ''):
     # heatmaps 
+    heatmap_path = os.path.join('heatmaps', subdir)
+    if not os.path.exists(heatmap_path):
+        os.makedirs(heatmap_path)
     for matrix in matrix_dict.keys():
         plot_matrix(matrix_dict[matrix])
-        plt.savefig('matrices_common_scales_renamed/' + str(matrix[0]) + '_' + str(matrix[1]))
+        filename = str(matrix[0]) + '_' + str(matrix[1])
+        plt.savefig(os.path.join(heatmap_path, filename))
         plt.close()
 
 
-def matrix_dict_dendrograms(matrix_dict):
+def matrix_dict_dendrograms(matrix_dict, subdir = ''):
     # make all dendrograms given a list of matrices
+    dendrogram_path = os.path.join('dendrograms', subdir)
+    if not os.path.exists(dendrogram_path):
+        os.makedirs(dendrogram_path)
     for matrix in matrix_dict.keys():
+        print(matrix)
+        if matrix_dict[matrix].shape[0] <= 1:
+            continue 
         Z = linkage(matrix_dict[matrix], 'ward')
         dendrogram(Z, leaf_rotation=0, leaf_font_size=4, labels=matrix_dict[matrix].index, orientation='left') 
-        plt.savefig('dendrograms/' + str(matrix[0]) + '_' + str(matrix[1]))
+
+        filename = str(matrix[0]) + '_' + str(matrix[1])
+        plt.savefig(os.path.join(dendrogram_path, filename)) 
         plt.close()
 
-def matrix_dict_clustermaps(matrix_dict, subdir = ''):
+def matrix_dict_clustermaps(matrix_dict, z = None, subdir = ''):
+    if z is None:
+        z = max([matrix[0] for matrix in matrix_dict.keys()])
     clustermap_path = os.path.join('clustermap', subdir)
     if not os.path.exists(clustermap_path):
         os.makedirs(clustermap_path)
@@ -421,7 +482,8 @@ def matrix_dict_clustermaps(matrix_dict, subdir = ''):
     for matrix in matrix_dict.keys():
         # if non-trivial clusterable
         # depends on type of matrix
-        if ( (matrix[0] > 1) & (matrix[1] > 1) & (matrix[0] < 12) & (matrix[1] < 12) ):
+        matrix_shape = matrix_dict[matrix].shape
+        if (matrix_shape[0] > 1) & (matrix_shape[1] > 1):
             if ( matrix_dict[matrix].shape[0] > 20) | (matrix_dict[matrix].shape[1] > 20):
                 f = 15
             else:
@@ -430,21 +492,27 @@ def matrix_dict_clustermaps(matrix_dict, subdir = ''):
                 figsize = (f,f), cbar_kws={'label': 'n transpositional siblings'})
             filename =  str(matrix[0]) + '_' + str(matrix[1])
             plt.savefig(os.path.join(clustermap_path, filename))
+            plt.close()
     
-def matrix_dict_clustermaps_all_subsets(matrix_dict, subdir = 'one_parent_all_subsets'):
-    clustermap_path = os.path.join('clustermap', subdir)
+def matrix_dict_clustermaps_all_subsets(matrix_dict, z = None, subdir = ''):
+    # plot 'WIDE' matrix.
+    if z is None:
+        z = max([matrix for matrix in matrix_dict.keys()])
+    clustermap_path = os.path.join('clustermap_wide_format', subdir)
     if not os.path.exists(clustermap_path):
         os.makedirs(clustermap_path)
     dpi = 72.27
     for matrix in matrix_dict.keys():
         # make sure elements are int.  
         # exclude matrix_dict[1] because it's empty
+        if matrix_dict[matrix].shape[0] <= 1:
+            continue 
         if isinstance(matrix, int) & (matrix > 1) :
             # cluster where possible
             cluster_rows = True 
             cluster_cols = True 
             # these matrices have only 1 row, so they can't be clustered 
-            if (matrix == 12) or (matrix == 11):
+            if (matrix == z) or (matrix == z - 1):
                 cluster_rows = False
             # this matrix has only 1 column, so it can't be clustered 
             elif matrix == 2:
@@ -468,13 +536,13 @@ def matrix_dict_clustermaps_all_subsets(matrix_dict, subdir = 'one_parent_all_su
             plt.savefig(os.path.join(clustermap_path, filename))
             plt.close()
 
-def make_all_subset_matrices(two_layer_matrix_dict):
+def make_all_subset_matrices(two_layer_matrix_dict,  z):
+    # 'WIDE' matrix
     # takes a dictionary of 2-layer matrices. 
     # returns an 11 element dictionary
     # shape of element number 5 is (n 5 scales, n_4_scales + n_3_scales + n_2_scales + n_1_scales).
-    # shape of element number 5 is (n 5 scales, n_4_scales + n_3_scales + n_2_scales + n_1_scales).
     all_subset_dict = {}
-    for x in reversed(range(1,13)): 
+    for x in reversed(range(1,z + 1)): 
         matrices_in_x = []
         for y in reversed(range(1, x)):
             matrices_in_x.append(two_layer_matrix_dict[(x,y)])
@@ -487,11 +555,20 @@ def make_all_subset_matrices(two_layer_matrix_dict):
 
 def get_twelve_tone_table():
     x = make_enum([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11])
-    x = rename_common_scales(x)
-    x = add_enantiomer(x)
+    x = rename_common_scales(x, z = 12, common_names_dict = common_names_12tet_dict)
+    x = add_enantiomer(x,  z = 12)
     return x
 
-def main():
+def get_nineteen_tone_table():
+    x = make_enum(range(0, 19))
+    print('renaming:')
+    edo19_common_names_dict = build_common_name_dict_19_tone()
+    x = rename_common_scales(x, z = 19, common_names_dict = edo19_common_names_dict)
+    print('checking for enantiomers:')
+    x = add_enantiomer(x, z = 19)
+    return x
+
+def main_twelve_tone():
     ## make a dataframe with the results from enumerating chords.
     ## Polya enumeration of unique chords invariant to transposition.
     x = get_twelve_tone_table()
@@ -500,22 +577,37 @@ def main():
         os.mkdir(data_dir)
     x.to_csv(os.path.join(data_dir,'twelve_tone_pitch_class_sets_enumerated.csv'))
 
-
-    
     omg = make_all_2layer_matrices(x)
     matrix_dict_dendrograms(omg)
     matrix_dict_clustermaps(omg, subdir = '')
     matrix_dict_heatmaps(omg)
-    d = e.make_all_subset_matrices(omg)
+    wide = make_all_subset_matrices(omg)
+
+def main_edos(max_n):
+    for edo in range(2, max_n+1):
+        x = make_enum(range(0, edo))
+        print(x)
+        x = rename_common_scales(x, z = edo)
+        x = add_enantiomer(x, z = edo)
+        # to do:  add enantiomer to tables!
+        edo_dir = "edo" + str(edo)
+        print(edo_dir)
+        omg = make_all_2layer_matrices(x, z = edo)
+        print('making heatmaps')
+        matrix_dict_heatmaps(omg, subdir = edo_dir)
+        print('making dendrograms')
+        matrix_dict_dendrograms(omg, subdir = edo_dir)
+        print('making clustermaps')
+        matrix_dict_clustermaps(omg, subdir = edo_dir)
+        print('making wide matrix')
+        wide = make_all_subset_matrices(omg, z = edo)
+        matrix_dict_clustermaps_all_subsets(wide, z = edo, subdir = edo_dir)
     
-
-
-
+    
 def apply_dark_style():
     plt.style.use('dark_background')
 
 
-
 if __name__ == '__main__':
-    main()
+    main_edos(max_n = 16)
 
