@@ -4,6 +4,8 @@
 
 A mathematical/computational investigation into the structure of ambiguity in Western harmony.
 
+THIS IS A BIG WORK IN PROGRESS.  THIS README IS A VERY ROUGH DRAFT.  you've been warned ;)
+
 # Driving Curiosity  
 
 What chords and scales are the most versatile?   By versatile, I mean what chords can be used in the most contexts?
