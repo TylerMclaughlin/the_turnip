@@ -11,7 +11,7 @@ THIS IS A BIG WORK IN PROGRESS.  THIS README IS A VERY ROUGH DRAFT.  you've been
 What chords and scales are the most versatile?   By versatile, I mean what chords can be used in the most contexts?
 The more versatile a chord is, the more opportunities a composer has to use that chord.
 I might liken versatility in harmony to 'ambiguity' of feeling or resolution.
-But also, the more ambiguous a harmony is, 
+But also, the more ambiguous a harmony is, the safer that chord is to use, because it's harder to juxtapose it with something that sounds bad.  
 The less ambiguous a harmony is, the more the listener expects what will come next, and the more opportunities the composer has to break or follow the expectations of the listener.  
 Playing with expectations--going back and forth between satisfying and denying the listener's predictions--is a part of music I enjoy the most.
 
